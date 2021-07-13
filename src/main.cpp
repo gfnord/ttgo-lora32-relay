@@ -74,7 +74,6 @@ void do_send(osjob_t* j){
 
   // Get the status of the pin
   relay0 = digitalRead(LEDPIN);
-  Serial.println(relay0);
 
   // Payload
   uint8_t buffer[2];
@@ -85,7 +84,7 @@ void do_send(osjob_t* j){
       Serial.println(F("OP_TXRXPEND, not sending"));
   } else {
       // Prepare upstream data transmission at the next possible time.
-      LMIC_setTxData2(1, buffer, sizeof(buffer), 1);
+      LMIC_setTxData2(1, buffer, sizeof(buffer), 0);
       Serial.print(F("Sending uplink packet..."));
       Serial.println(counter);
       Serial.print(F("Relay Status:"));
@@ -129,9 +128,29 @@ void onEvent (ev_t ev) {
       }
       if (LMIC.dataLen) {
         // data received in rx slot after tx
-        Serial.print(F("Data Received: "));
-        Serial.println(LMIC.dataLen);
-        display.drawString (0, 20, "Received DATA.");
+        Serial.print(F("Data Received (Port and Data): "));
+        int i;
+        int downlink_port;
+        downlink_port = LMIC.frame[LMIC.dataBeg-1];
+        Serial.print(downlink_port);
+        Serial.print(F(" "));
+        char downlink_payload[LMIC.dataLen];
+        for ( i = 0 ; i < LMIC.dataLen ; i++ )
+          downlink_payload[i] = LMIC.frame[LMIC.dataBeg+i];
+        downlink_payload[i] = 0;
+        Serial.println(downlink_payload);
+        // What to do with the downlink payload
+        if (downlink_port == 9){
+          if (*downlink_payload == '1') {
+            // Turn on relay
+            digitalWrite(LEDPIN, HIGH);
+          }
+          if (*downlink_payload == '0') {
+            // Turn on relay
+            digitalWrite(LEDPIN, LOW);
+          }
+        }  
+        display.drawString (0, 30, "Received DATA.");
       }
       // Schedule next transmission
       os_setTimedCallback(&sendjob, os_getTime()+sec2osticks(TX_INTERVAL), do_send);
