@@ -109,42 +109,77 @@ void do_send(osjob_t* j){
 }
 
 void onEvent (ev_t ev) {
-  if (ev == EV_TXCOMPLETE) {
-    display.clear();
-    display.drawString (0, 0, "EV_TXCOMPLETE event!");
-    relay0 = digitalRead(LEDPIN);
-    display.drawString (0, 20, "Relay Status:");
-    if(relay0){
-      display.drawString (70, 20, "ON");
-    } else {
-      display.drawString (70, 20, "OFF");
-    }
-    Serial.println(F("EV_TXCOMPLETE (includes waiting for RX windows)"));
-    if (LMIC.txrxFlags & TXRX_ACK) {
-      Serial.println(F("Received ack"));
-      display.drawString (0, 20, "Received ACK.");
-    }
+  Serial.print(os_getTime());
+  Serial.print(": ");
+  switch(ev) {
+    case EV_TXCOMPLETE:
+      display.clear();
+      display.drawString (0, 0, "EV_TXCOMPLETE event!");
+      relay0 = digitalRead(LEDPIN);
+      display.drawString (0, 20, "Relay Status:");
+      if(relay0){
+        display.drawString (70, 20, "ON");
+      } else {
+        display.drawString (70, 20, "OFF");
+      }
+      Serial.println(F("EV_TXCOMPLETE (includes waiting for RX windows)"));
+      if (LMIC.txrxFlags & TXRX_ACK) {
+        Serial.println(F("Received ack"));
+        display.drawString (0, 20, "Received ACK.");
+      }
+      if (LMIC.dataLen) {
+        // data received in rx slot after tx
+        Serial.print(F("Data Received: "));
+        Serial.println(LMIC.dataLen);
+        display.drawString (0, 20, "Received DATA.");
+      }
+      // Schedule next transmission
+      os_setTimedCallback(&sendjob, os_getTime()+sec2osticks(TX_INTERVAL), do_send);
+      display.drawString (0, 50, String (counter));
+      display.display ();
+      counter++;
+      Serial.println("Waiting the next scheduled package.");
+      break;
 
-    if (LMIC.dataLen) {
-      int i = 0;
-      // data received in rx slot after tx
-      Serial.print(F("Data Received: "));
-      Serial.write(LMIC.frame+LMIC.dataBeg, LMIC.dataLen);
-      Serial.println();
+    case EV_JOIN_FAILED:
+      Serial.println(F("EV_JOIN_FAILED"));
+      break;
+    case EV_REJOIN_FAILED:
+      Serial.println(F("EV_REJOIN_FAILED"));
+      break;
+    case EV_LOST_TSYNC:
+      Serial.println(F("EV_LOST_TSYNC"));
+      break;
+    case EV_RESET:
+      Serial.println(F("EV_RESET"));
+      break;
+    case EV_RXCOMPLETE:
+      // data received in ping slot
+      Serial.println(F("EV_RXCOMPLETE"));
+      break;
+    case EV_LINK_DEAD:
+      Serial.println(F("EV_LINK_DEAD"));
+      break;
+    case EV_LINK_ALIVE:
+      Serial.println(F("EV_LINK_ALIVE"));
+      break;
+    case EV_TXSTART:
+      Serial.println(F("EV_TXSTART"));
+      break;
+    case EV_TXCANCELED:
+      Serial.println(F("EV_TXCANCELED"));
+      break;
+    case EV_RXSTART:
+      /* do not print anything -- it wrecks timing */
+      break;
+    case EV_JOIN_TXCOMPLETE:
+      Serial.println(F("EV_JOIN_TXCOMPLETE: no JoinAccept"));
+      break;
+    default:
+      Serial.print(F("Unknown event: "));
+      Serial.println((unsigned) ev);
+       break;
 
-      display.drawString (0, 20, "Received DATA.");
-      for ( i = 0 ; i < LMIC.dataLen ; i++ )
-        TTN_response[i] = LMIC.frame[LMIC.dataBeg+i];
-      TTN_response[i] = 0;
-      display.drawString (0, 32, String(TTN_response));
-    }
-
-    // Schedule next transmission
-    os_setTimedCallback(&sendjob, os_getTime()+sec2osticks(TX_INTERVAL), do_send);
-    display.drawString (0, 50, String (counter));
-    display.display ();
-    counter++;
-    Serial.println("Waiting the next scheduled package.");
   }
 }
 
